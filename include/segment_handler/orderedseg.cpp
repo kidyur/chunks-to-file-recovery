@@ -84,8 +84,9 @@ void OrderedSegments::handleChunk(Chunk chunk) {
     // Remaining uncovered bytes
     addWork(cursor, end);
     segments.insert(seg);
-
+    std::cout << (int)segments.size() << "<< segments\n";
+    // todo: notify only if add work
     if (isAsync_ && queued) {
-        alarm_->notify_all();
+        alarm_->notify_one();
     }
 }

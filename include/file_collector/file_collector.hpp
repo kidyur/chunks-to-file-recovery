@@ -34,7 +34,7 @@ public:
     GetFile(const std::uint32_t fileId);
     
 
-    bool IsReady(const std::uint32_t fileId) const;
+    bool IsReady(const std::uint32_t fileId);
 
     static constexpr size_t kMaxChunkSize = 4096;
 private:
@@ -45,7 +45,6 @@ private:
     void work();
     struct File {
         std::vector<std::uint8_t> chunks;  
-        std::set<Segment, Comp> segments;
         std::optional<OrderedSegments> ordseg;
         std::atomic<std::int64_t> workers;
     };

@@ -114,6 +114,21 @@ TEST(segments, MnsertUnmergeableSegments)
     EXPECT_EQ(os.work->size(), 3);
 }
 
+TEST(segments, ChunkForDoneFile) 
+{
+    OrderedSegments os(new std::queue<Chunk>);
+    
+    os.handleChunk({FILE_ID, 3, {4, 5, 6}});
+    os.handleChunk({FILE_ID, 0, {1, 2, 3}});
+    os.handleChunk({FILE_ID, 2, {3, 4}});
+
+    auto it = os.segments.begin();
+    EXPECT_EQ(*it, Segment({0, 5}));
+    EXPECT_EQ(os.work->size(), 2);
+    EXPECT_EQ(os.work->front().data, std::vector<uint8_t>({4, 5, 6}));
+    EXPECT_EQ(os.work->back().data, std::vector<uint8_t>({1, 2, 3}));
+}
+
 TEST(segments, splitBackwards) 
 {
     OrderedSegments os(new std::queue<Chunk>);

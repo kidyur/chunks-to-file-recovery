@@ -9,6 +9,26 @@
 #define EVEN_SIZE 4
 #define ODD_SIZE  3
 
+TEST(FileCollectorTest, SimpleAssembly) {
+    FileCollector fc;
+    fc.CollectFile(FILE_ID, 6);
+
+    fc.OnNewChunk(FILE_ID, 3, {4, 5, 6});
+    fc.OnNewChunk(FILE_ID, 0, {1, 2, 3});
+    fc.OnNewChunk(FILE_ID, 2, {3, 4});
+    while (!fc.IsReady(FILE_ID)) {
+        std::this_thread::sleep_for(
+            std::chrono::milliseconds(1)
+        );
+    }
+
+    ASSERT_TRUE(fc.IsReady(FILE_ID));
+    EXPECT_EQ(
+        fc.GetFile(FILE_ID),
+        (std::vector<std::uint8_t>{1, 2, 3, 4, 5, 6})
+    );
+}
+
 TEST(FileCollectorTest, bigFileWithIntersectedChunks) {
     FileCollector fc;
     fc.CollectFile(FILE_ID, 40000);
@@ -34,25 +54,7 @@ TEST(FileCollectorTest, bigFileWithIntersectedChunks) {
     );    
 }
 
-TEST(FileCollectorTest, SimpleAssembly) {
-    FileCollector fc;
-    fc.CollectFile(FILE_ID, 6);
 
-    fc.OnNewChunk(FILE_ID, 3, {4, 5, 6});
-    fc.OnNewChunk(FILE_ID, 0, {1, 2, 3});
-    fc.OnNewChunk(FILE_ID, 2, {3, 4});
-    while (!fc.IsReady(FILE_ID)) {
-        std::this_thread::sleep_for(
-            std::chrono::milliseconds(1)
-        );
-    }
-
-    ASSERT_TRUE(fc.IsReady(FILE_ID));
-    EXPECT_EQ(
-        fc.GetFile(FILE_ID),
-        (std::vector<std::uint8_t>{1, 2, 3, 4, 5, 6})
-    );
-}
 
 TEST(ChunkHandling, overlapping) {
     FileCollector fc;

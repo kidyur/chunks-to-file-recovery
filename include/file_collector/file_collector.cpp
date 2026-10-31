@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <map>
 #include <mutex>
+#include <iostream>
 #include <thread>
 
 #include "file_collector.hpp"
@@ -95,7 +96,11 @@ void FileCollector::work() {
 
         auto chunk = chunksQuery.front();
         files_[chunk.fileId].workers++;
+        std::cout << '\n' << files_[chunk.fileId].workers << "workers\n";
+
         chunksQuery.pop();
+        std::cout << '\n' << chunksQuery.size() << '\n';
+
 
         std::copy(
             chunk.data.begin(),
@@ -111,22 +116,22 @@ FileCollector::GetFile(const std::uint32_t fileId)
 {
     if (files_.count(fileId) == 0)
         throw std::invalid_argument("File ID does not exist");
-    if (IsReady(fileId) == false) 
-        throw std::runtime_error("File is not ready yet");
 
     const std::vector<std::uint8_t>& view = files_.at(fileId).chunks;
     return view;
 }
 
 
-bool FileCollector::IsReady(const std::uint32_t fileId) const 
+bool FileCollector::IsReady(const std::uint32_t fileId)  
 {
     if (files_.count(fileId) == 0)
         throw std::invalid_argument("File ID does not exist");
     auto& file = files_.at(fileId);
-    if (file.workers.load() != 0) 
+    if (file.workers != 0) 
         return false;
-    if (file.segments.empty())
+    std::lock_guard<std::mutex> lock(file.ordseg->segmentsMutex);
+    if (file.ordseg->segments.empty()) {
         return false;
-    return file.segments.begin()->l == 0 && file.segments.begin()->r == file.chunks.size() - 1;
+    }
+    return (file.ordseg->segments.begin()->l == 0) && (file.ordseg->segments.begin()->r == (file.chunks.size() - 1));
 }
