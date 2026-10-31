@@ -1,0 +1,2 @@
+add_subdirectory(file_collector)
+add_subdirectory(segment_handler)
