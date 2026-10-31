@@ -37,10 +37,11 @@ void showQueue(std::queue<T>& q) {
 
 TEST(workQuery, oneInsert) 
 {
-    OrderedSegments os(new std::queue<Chunk>, 0);
+    OrderedSegments os(new std::queue<Chunk>);
     
     os.handleChunk({FILE_ID, 1, {0,1,2}});
 
+    showQueue(*os.work);
     auto w = os.work->front();
     EXPECT_EQ(w.data.size(), 3);
     EXPECT_EQ(w.pos, 1);
@@ -52,7 +53,7 @@ TEST(workQuery, oneInsert)
 
 TEST(workQuery, insertUnmergeable) 
 {
-    OrderedSegments os(new std::queue<Chunk>, 0);
+    OrderedSegments os(new std::queue<Chunk>);
     
     os.handleChunk({FILE_ID, 0, {0,1}});
     os.handleChunk({FILE_ID, 5, {0,1,2}});
@@ -75,7 +76,7 @@ TEST(workQuery, insertUnmergeable)
 
 TEST(workQuery, insertMergeableBackwards) 
 {
-    OrderedSegments os(new std::queue<Chunk>, 0);
+    OrderedSegments os(new std::queue<Chunk>);
     
     os.handleChunk({FILE_ID, 0, {0,1,2,3,4}});
     os.handleChunk({FILE_ID, 2, {2,3,4,5,6}});
@@ -98,7 +99,7 @@ TEST(workQuery, insertMergeableBackwards)
 
 TEST(segments, MnsertUnmergeableSegments) 
 {
-    OrderedSegments os(new std::queue<Chunk>, 0);
+    OrderedSegments os(new std::queue<Chunk>);
     
     os.handleChunk({FILE_ID, 0, {0,0,0}});
     os.handleChunk({FILE_ID, 5, {0,0}});
@@ -115,7 +116,7 @@ TEST(segments, MnsertUnmergeableSegments)
 
 TEST(segments, splitBackwards) 
 {
-    OrderedSegments os(new std::queue<Chunk>, 0);
+    OrderedSegments os(new std::queue<Chunk>);
     
     os.handleChunk({FILE_ID, 0, {0,0,0,0,0}});
     os.handleChunk({FILE_ID, 3, {0,0,0}});
@@ -131,7 +132,7 @@ TEST(segments, splitBackwards)
 
 TEST(segments, splitForward) 
 {
-    OrderedSegments os(new std::queue<Chunk>, 0);
+    OrderedSegments os(new std::queue<Chunk>);
     
     os.handleChunk({FILE_ID, 0, {0,0,0}});
     os.handleChunk({FILE_ID, 4, {0,0,0,0,0}});
@@ -146,7 +147,7 @@ TEST(segments, splitForward)
 
 TEST(segments, splitForwardsAndBackwards) 
 {
-    OrderedSegments os(new std::queue<Chunk>, 0);
+    OrderedSegments os(new std::queue<Chunk>);
     
     os.handleChunk({FILE_ID, 0, {0,0,0}});
     os.handleChunk({FILE_ID, 6, {0,0,0,0}});
@@ -169,7 +170,7 @@ TEST(segments, splitForwardsAndBackwards)
 
 TEST(segments, OneByOne) 
 {
-    OrderedSegments os(new std::queue<Chunk>, 0);
+    OrderedSegments os(new std::queue<Chunk>);
     
     os.handleChunk({FILE_ID, 0, {0}});
     os.handleChunk({FILE_ID, 1, {1}});
@@ -195,7 +196,7 @@ TEST(segments, OneByOne)
 
 TEST(segments, duplicatesAddNoWorkAndSegment) 
 {
-    OrderedSegments os(new std::queue<Chunk>, 0);
+    OrderedSegments os(new std::queue<Chunk>);
     
     os.handleChunk({FILE_ID, 0, {0,1,2}});
     os.handleChunk({FILE_ID, 0, {0,1,2}});
@@ -212,7 +213,7 @@ TEST(segments, duplicatesAddNoWorkAndSegment)
 
 TEST(segments, emptyChunk) 
 {
-    OrderedSegments os(new std::queue<Chunk>, 0);
+    OrderedSegments os(new std::queue<Chunk>);
     
     os.handleChunk({FILE_ID, 4, {}});
 
@@ -223,7 +224,7 @@ TEST(segments, emptyChunk)
 
 TEST(segments, splitPoints) 
 {
-    OrderedSegments os(new std::queue<Chunk>, 0);
+    OrderedSegments os(new std::queue<Chunk>);
     
     os.handleChunk({FILE_ID, 0, {0}});
     os.handleChunk({FILE_ID, 2, {1}});
@@ -245,7 +246,7 @@ TEST(segments, splitPoints)
 
 TEST(segments, splitIntervals) 
 {
-    OrderedSegments os(new std::queue<Chunk>, 0);
+    OrderedSegments os(new std::queue<Chunk>);
     
     os.handleChunk({FILE_ID, 0, {0, 1}});
     os.handleChunk({FILE_ID, 3, {3, 4}});

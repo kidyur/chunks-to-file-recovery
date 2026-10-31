@@ -1,10 +1,12 @@
 #include "orderedseg.hpp"
 #include <stdexcept>
-
+#include <iostream>
 
 void OrderedSegments::makeAsync(std::mutex* workMutex, std::condition_variable* alarm) {
     if (workMutex == nullptr || alarm == nullptr)
         throw std::invalid_argument("invalid arguments for async mode");
+    std::lock_guard lockWork(*workMutex);
+    std::lock_guard lockSegments(segmentsMutex);
     workMutex_ = workMutex;
     alarm_ = alarm;
     isAsync_ = true;
@@ -12,29 +14,18 @@ void OrderedSegments::makeAsync(std::mutex* workMutex, std::condition_variable* 
 
 void OrderedSegments::handleChunk(Chunk chunk) {
     if (chunk.data.empty()) return;
-
-    std::lock_guard segLock(segmentsMutex);
-
-    std::unique_lock<std::mutex> workLock;
-    if (isAsync_) {
-        workLock = std::unique_lock<std::mutex>(*workMutex_);
-    }
+    if (chunk.data.size() > SIZE_MAX - chunk.pos) 
+        throw std::out_of_range("Chunk position overflow");
+    std::unique_lock<std::mutex> segLock;
+    if (isAsync_) segLock = std::unique_lock<std::mutex>(segmentsMutex);
 
     const size_t begin = chunk.pos;
-
-    if (chunk.data.size() > SIZE_MAX - begin) {
-        throw std::out_of_range("Chunk position overflow");
-    }
-
     const size_t end = begin + chunk.data.size();
-
     Segment seg{begin, end - 1};
-
     auto it = segments.lower_bound(seg);
 
     if (it != segments.begin()) {
         auto prev = std::prev(it);
-
         if (prev->r >= begin ||
             (begin > 0 && prev->r == begin - 1)) {
             it = prev;
@@ -47,7 +38,10 @@ void OrderedSegments::handleChunk(Chunk chunk) {
     // Add only uncovered bytes to the queue
     auto addWork = [&](size_t l, size_t r) {
         if (l >= r) return;
-
+        std::unique_lock<std::mutex> workLock;
+        if (isAsync_) {
+            workLock = std::unique_lock<std::mutex>(*workMutex_);
+        }
         work->push({
             chunk.fileId,
             l,
@@ -56,7 +50,10 @@ void OrderedSegments::handleChunk(Chunk chunk) {
                 chunk.data.begin() + (r - begin)
             )
         });
-
+        if (isAsync_) {
+            workLock.unlock();
+            alarm_->notify_one();
+        }
         queued = true;
     };
 
@@ -86,20 +83,9 @@ void OrderedSegments::handleChunk(Chunk chunk) {
 
     // Remaining uncovered bytes
     addWork(cursor, end);
-
     segments.insert(seg);
 
     if (isAsync_ && queued) {
-        workLock.unlock();
         alarm_->notify_all();
     }
-}
-
-
-bool OrderedSegments::isReady() {
-    std::lock_guard seglock(segmentsMutex);
-    if (segments.empty())
-        return false;
-    auto first = segments.begin();
-    return first->l == 0 && first->r == fileSize_-1;
 }

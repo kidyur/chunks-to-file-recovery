@@ -16,12 +16,8 @@
 class OrderedSegments {
 public:
     OrderedSegments(
-        std::queue<Chunk>* q,
-        size_t fsz
-    ) {
-        work = q;
-        fileSize_ = fsz; 
-    }
+        std::queue<Chunk>* q
+    ) : work(q) { }
 
     std::mutex segmentsMutex;
     std::set<Segment, Comp> segments;
@@ -33,11 +29,7 @@ public:
 
     void handleChunk(Chunk chunk);
 
-
-    bool isReady();
-
 private:
-    std::int32_t fileSize_          = 0; 
     bool isAsync_                   = false;
     std::condition_variable* alarm_ = nullptr;
     std::mutex* workMutex_          = nullptr;

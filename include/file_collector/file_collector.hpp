@@ -11,6 +11,7 @@
 #include <vector>
 #include <condition_variable>
 #include <optional>
+#include <atomic>
 #include <set>
 
 class FileCollector {
@@ -33,7 +34,7 @@ public:
     GetFile(const std::uint32_t fileId);
     
 
-    bool IsReady(const std::uint32_t fileId);
+    bool IsReady(const std::uint32_t fileId) const;
 
     static constexpr size_t kMaxChunkSize = 4096;
 private:
@@ -46,6 +47,7 @@ private:
         std::vector<std::uint8_t> chunks;  
         std::set<Segment, Comp> segments;
         std::optional<OrderedSegments> ordseg;
+        std::atomic<std::int64_t> workers;
     };
     std::vector<std::thread> threads_;
 

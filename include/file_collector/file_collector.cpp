@@ -46,11 +46,9 @@ void FileCollector::CollectFile(
         throw std::invalid_argument("File ID already exists");
 
     files_[fileId].chunks.resize(fileSize);
-    files_[fileId].ordseg.emplace(
-        &chunksQuery, 
-        fileSize
-    );
+    files_[fileId].ordseg.emplace(&chunksQuery);
     files_[fileId].ordseg->makeAsync(&chunksQueryMutex, &chunksQueryCv);
+    files_[fileId].workers = 0;
 }
 
 
@@ -96,6 +94,7 @@ void FileCollector::work() {
         }
 
         auto chunk = chunksQuery.front();
+        files_[chunk.fileId].workers++;
         chunksQuery.pop();
 
         std::copy(
@@ -103,6 +102,7 @@ void FileCollector::work() {
             chunk.data.end(),
             files_[chunk.fileId].chunks.begin() + chunk.pos
         );
+        files_[chunk.fileId].workers--;
     }
 }
 
@@ -119,10 +119,14 @@ FileCollector::GetFile(const std::uint32_t fileId)
 }
 
 
-bool FileCollector::IsReady(const std::uint32_t fileId)  
+bool FileCollector::IsReady(const std::uint32_t fileId) const 
 {
     if (files_.count(fileId) == 0)
         throw std::invalid_argument("File ID does not exist");
-
-    return files_.at(fileId).ordseg->isReady();
+    auto& file = files_.at(fileId);
+    if (file.workers.load() != 0) 
+        return false;
+    if (file.segments.empty())
+        return false;
+    return file.segments.begin()->l == 0 && file.segments.begin()->r == file.chunks.size() - 1;
 }
