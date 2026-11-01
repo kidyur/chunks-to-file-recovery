@@ -15,7 +15,7 @@ FileCollector::FileCollector()
 {
     threadsAvailable = std::thread::hardware_concurrency();
     if (threadsAvailable == 0) {
-        threadsAvailable = 1;
+        threadsAvailable = FileCollector::kDefThreadsNumber;
     }
     threads_.reserve(threadsAvailable);
     for (int i = 0; i < threadsAvailable; i++) {
@@ -49,7 +49,6 @@ void FileCollector::CollectFile(
     files_[fileId].chunks.resize(fileSize);
     files_[fileId].ordseg.emplace(&chunksQuery);
     files_[fileId].ordseg->makeAsync(&chunksQueryMutex, &chunksQueryCv);
-    files_[fileId].workers = 0;
 }
 
 
@@ -62,6 +61,8 @@ void FileCollector::OnNewChunk(
         throw std::invalid_argument("File ID does not exist");
     if (pos + chunk.size() > files_[fileId].chunks.size())  
         throw std::out_of_range("Chunk size is out of file's bounds");
+    if (files_[fileId].dataRestored == files_[fileId].chunks.size())
+        return;
 
     if (chunk.size() > FileCollector::kMaxChunkSize) {
         for (size_t i = 0; i < chunk.size(); i += FileCollector::kMaxChunkSize) {
@@ -95,31 +96,26 @@ void FileCollector::work() {
         }
 
         auto chunk = chunksQuery.front();
-        files_[chunk.fileId].workers++;
-        std::cout << '\n' << files_[chunk.fileId].workers << "workers\n";
 
         chunksQuery.pop();
-        std::cout << '\n' << chunksQuery.size() << '\n';
-
 
         std::copy(
             chunk.data.begin(),
             chunk.data.end(),
             files_[chunk.fileId].chunks.begin() + chunk.pos
         );
-        files_[chunk.fileId].workers--;
         files_[chunk.fileId].dataRestored += chunk.data.size();
     }
 }
 
-const std::vector<std::uint8_t>& 
-FileCollector::GetFile(const std::uint32_t fileId) 
+std::vector<std::uint8_t> FileCollector::GetFile(const std::uint32_t fileId) 
 {
     if (files_.count(fileId) == 0)
         throw std::invalid_argument("File ID does not exist");
-
-    const std::vector<std::uint8_t>& view = files_.at(fileId).chunks;
-    return view;
+    if (IsReady(fileId)) 
+        return files_.at(fileId).chunks;
+    std::vector<std::uint8_t> unfinishedFile = {};
+    return unfinishedFile;
 }
 
 
@@ -128,7 +124,5 @@ bool FileCollector::IsReady(const std::uint32_t fileId)
     if (files_.count(fileId) == 0)
         throw std::invalid_argument("File ID does not exist");
     auto& file = files_.at(fileId);
-    if (file.workers != 0) 
-        return false;
     return file.dataRestored == file.chunks.size();
 }

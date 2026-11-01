@@ -5,8 +5,6 @@
 void OrderedSegments::makeAsync(std::mutex* workMutex, std::condition_variable* alarm) {
     if (workMutex == nullptr || alarm == nullptr)
         throw std::invalid_argument("invalid arguments for async mode");
-    std::lock_guard lockWork(*workMutex);
-    std::lock_guard lockSegments(segmentsMutex);
     workMutex_ = workMutex;
     alarm_ = alarm;
     isAsync_ = true;
@@ -33,7 +31,6 @@ void OrderedSegments::handleChunk(Chunk chunk) {
     }
 
     size_t cursor = begin;
-    bool queued = false;
 
     // Add only uncovered bytes to the queue
     auto addWork = [&](size_t l, size_t r) {
@@ -54,7 +51,6 @@ void OrderedSegments::handleChunk(Chunk chunk) {
             workLock.unlock();
             alarm_->notify_one();
         }
-        queued = true;
     };
 
     while (it != segments.end()) {
@@ -84,9 +80,4 @@ void OrderedSegments::handleChunk(Chunk chunk) {
     // Remaining uncovered bytes
     addWork(cursor, end);
     segments.insert(seg);
-    std::cout << (int)segments.size() << "<< segments\n";
-    // todo: notify only if add work
-    if (isAsync_ && queued) {
-        alarm_->notify_one();
-    }
 }

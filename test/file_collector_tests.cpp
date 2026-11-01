@@ -37,9 +37,8 @@ TEST(FileCollectorTest, bigFileWithIntersectedChunks) {
     for (int i = 0; i < 40000; i++) hugefile[i] = i;
     
 
-    // for (int i = 0; i < 35001; i+=5000) 
-    //     fc.OnNewChunk(FILE_ID, i, std::vector<std::uint8_t>(hugefile.begin() + i, hugefile.begin() + i + 5000));
-    fc.OnNewChunk(FILE_ID, 0, std::vector<std::uint8_t>(hugefile));
+    for (int i = 0; i < 35001; i+=5000) 
+        fc.OnNewChunk(FILE_ID, i, std::vector<std::uint8_t>(hugefile.begin() + i, hugefile.begin() + i + 5000));
 
     while (!fc.IsReady(FILE_ID)) {
         std::this_thread::sleep_for(

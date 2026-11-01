@@ -30,14 +30,14 @@ public:
         std::vector<std::uint8_t>&& chunk);
 
 
-    const std::vector<std::uint8_t>& 
-    GetFile(const std::uint32_t fileId);
+    std::vector<std::uint8_t> GetFile(const std::uint32_t fileId);
     
 
     bool IsReady(const std::uint32_t fileId);
 
-    static constexpr size_t kMaxChunkSize = 4096;
 private:
+    static constexpr size_t kMaxChunkSize = 4096;
+    static constexpr size_t kDefThreadsNumber = 4;
     std::uint32_t threadsAvailable = 0;
 
     bool stopping_ = false;
@@ -46,7 +46,6 @@ private:
     struct File {
         std::vector<std::uint8_t> chunks;  
         std::optional<OrderedSegments> ordseg;
-        std::atomic<std::int64_t> workers;
         std::atomic<std::int64_t> dataRestored;
     };
     std::vector<std::thread> threads_;
