@@ -47,6 +47,7 @@ private:
         std::vector<std::uint8_t> chunks;  
         std::optional<OrderedSegments> ordseg;
         std::atomic<std::int64_t> workers;
+        std::atomic<std::int64_t> dataRestored;
     };
     std::vector<std::thread> threads_;
 

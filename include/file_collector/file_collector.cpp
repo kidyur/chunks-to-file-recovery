@@ -108,6 +108,7 @@ void FileCollector::work() {
             files_[chunk.fileId].chunks.begin() + chunk.pos
         );
         files_[chunk.fileId].workers--;
+        files_[chunk.fileId].dataRestored += chunk.data.size();
     }
 }
 
@@ -129,9 +130,5 @@ bool FileCollector::IsReady(const std::uint32_t fileId)
     auto& file = files_.at(fileId);
     if (file.workers != 0) 
         return false;
-    std::lock_guard<std::mutex> lock(file.ordseg->segmentsMutex);
-    if (file.ordseg->segments.empty()) {
-        return false;
-    }
-    return (file.ordseg->segments.begin()->l == 0) && (file.ordseg->segments.begin()->r == (file.chunks.size() - 1));
+    return file.dataRestored == file.chunks.size();
 }
