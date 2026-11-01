@@ -46,7 +46,8 @@ void FileCollector::CollectFile(
     if (files_.count(fileId) == 1) 
         throw std::invalid_argument("File ID already exists");
 
-    files_[fileId].chunks.resize(fileSize);
+    files_[fileId].fileSize = fileSize;
+    files_[fileId].dataRestored = 0;
     files_[fileId].ordseg.emplace(&chunksQuery);
     files_[fileId].ordseg->makeAsync(&chunksQueryMutex, &chunksQueryCv);
 }
@@ -59,9 +60,9 @@ void FileCollector::OnNewChunk(
 {
     if (files_.count(fileId) == 0)  
         throw std::invalid_argument("File ID does not exist");
-    if (pos + chunk.size() > files_[fileId].chunks.size())  
+    if (pos + chunk.size() > files_[fileId].fileSize)  
         throw std::out_of_range("Chunk size is out of file's bounds");
-    if (files_[fileId].dataRestored == files_[fileId].chunks.size())
+    if (files_[fileId].dataRestored == files_[fileId].fileSize)
         return;
 
     if (chunk.size() > FileCollector::kMaxChunkSize) {
@@ -97,13 +98,9 @@ void FileCollector::work() {
 
         auto chunk = chunksQuery.front();
 
+        files_[chunk.fileId].chunks.insert(chunk);
         chunksQuery.pop();
 
-        std::copy(
-            chunk.data.begin(),
-            chunk.data.end(),
-            files_[chunk.fileId].chunks.begin() + chunk.pos
-        );
         files_[chunk.fileId].dataRestored += chunk.data.size();
     }
 }
@@ -112,10 +109,23 @@ std::vector<std::uint8_t> FileCollector::GetFile(const std::uint32_t fileId)
 {
     if (files_.count(fileId) == 0)
         throw std::invalid_argument("File ID does not exist");
-    if (IsReady(fileId)) 
-        return files_.at(fileId).chunks;
-    std::vector<std::uint8_t> unfinishedFile = {};
-    return unfinishedFile;
+    if (IsReady(fileId) == false) 
+        return {};
+
+    auto it = files_.at(fileId).chunks.begin();
+    std::vector<std::uint8_t> file;
+    file.resize(files_.at(fileId).fileSize);
+    size_t pos = 0;
+    while (pos != files_.at(fileId).fileSize) {
+        for (size_t i = 0; i < it->data.size(); i++)  {
+            file[pos + i] = it->data[i];
+            std::cout << it->data[i];
+        }
+        std::cout << '\n';
+        pos += it->data.size();
+        it++;
+    }
+    return file;
 }
 
 
@@ -124,5 +134,5 @@ bool FileCollector::IsReady(const std::uint32_t fileId)
     if (files_.count(fileId) == 0)
         throw std::invalid_argument("File ID does not exist");
     auto& file = files_.at(fileId);
-    return file.dataRestored == file.chunks.size();
+    return file.dataRestored == file.fileSize;
 }

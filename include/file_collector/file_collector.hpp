@@ -44,9 +44,10 @@ private:
 
     void work();
     struct File {
-        std::vector<std::uint8_t> chunks;  
+        std::set<Chunk, CompChunks> chunks;  
         std::optional<OrderedSegments> ordseg;
         std::atomic<std::int64_t> dataRestored;
+        size_t fileSize;
     };
     std::vector<std::thread> threads_;
 
