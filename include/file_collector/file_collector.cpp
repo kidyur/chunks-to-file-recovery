@@ -96,12 +96,12 @@ void FileCollector::work() {
             return;
         }
 
-        auto chunk = chunksQuery.front();
-
-        files_[chunk.fileId].chunks.insert(chunk);
+        std::uint64_t id = chunksQuery.front().fileId;
+        std::uint64_t size = chunksQuery.front().data.size();
+        files_[id].chunks.insert(std::move(chunksQuery.front()));
         chunksQuery.pop();
 
-        files_[chunk.fileId].dataRestored += chunk.data.size();
+        files_[id].dataRestored += size;
     }
 }
 
