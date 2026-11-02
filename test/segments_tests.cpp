@@ -3,16 +3,15 @@
 #include <queue>
 #include <iostream>
 #include <segment_handler/orderedseg.hpp>
-
+#include <set>
+#include <types.hpp>
 #define FILE_ID 0
 
 class OrderedSegmentsTest {
 public:
-    std::queue<Chunk> q;                  
-    OrderedSegments os{&q}; 
-    std::queue<Chunk>& work() { return *os.work; }
+    OrderedSegments os; 
     std::set<Segment, Comp>& segs() { return os.segments; }
-    void handleChunk(Chunk ch) { os.handleChunk(ch); };
+    std::set<Chunk, CompChunks> handleChunk(Chunk c) { return os.handleChunk(c); };
 };
 
 
@@ -48,72 +47,75 @@ static bool operator==(const Segment& s1, const Segment& s2) {
 TEST(workQuery, oneInsert) 
 {
     OrderedSegmentsTest os;
+    std::set<Chunk, CompChunks> rez;
     
-    os.handleChunk({FILE_ID, 1, {0,1,2}});
+    rez.merge(os.handleChunk({FILE_ID, 1, {0,1,2}}));
 
-    os.work();
-    auto w = os.work().front();
+    auto w = *rez.begin();
     EXPECT_EQ(w.data.size(), 3);
     EXPECT_EQ(w.pos, 1);
     for (int i = 0; i < 3; i++) {
         EXPECT_EQ(w.data[i], i);
     }
-    EXPECT_EQ(os.work().size(), 1);
+    EXPECT_EQ(rez.size(), 1);
 }
 
 TEST(workQuery, insertUnmergeable) 
 {
     OrderedSegmentsTest os;
+    std::set<Chunk, CompChunks> rez;
     
-    os.handleChunk({FILE_ID, 0, {0,1}});
-    os.handleChunk({FILE_ID, 5, {0,1,2}});
+    rez.merge(os.handleChunk({FILE_ID, 0, {0,1}}));
+    rez.merge(os.handleChunk({FILE_ID, 5, {0,1,2}}));
 
-    auto front = os.work().front();
+    auto front = *rez.begin();
     EXPECT_EQ(front.data.size(), 2);
     EXPECT_EQ(front.pos, 0);
     for (int i = 0; i < 2; i++) {
         EXPECT_EQ(front.data[i], i);
     }
 
-    auto back = os.work().back();
+    auto back = *std::prev(rez.end());
     EXPECT_EQ(back.data.size(), 3);
     EXPECT_EQ(back.pos, 5);
     for (int i = 0; i < 3; i++) {
         EXPECT_EQ(back.data[i], i);
     }
-    EXPECT_EQ(os.work().size(), 2);
+    EXPECT_EQ(rez.size(), 2);
 }
 
 TEST(workQuery, insertMergeableBackwards) 
 {
     OrderedSegmentsTest os;
+    std::set<Chunk, CompChunks> rez;
     
-    os.handleChunk({FILE_ID, 0, {0,1,2,3,4}});
-    os.handleChunk({FILE_ID, 2, {2,3,4,5,6}});
+    rez.merge(os.handleChunk({FILE_ID, 0, {0,1,2,3,4}}));
+    rez.merge(os.handleChunk({FILE_ID, 2, {2,3,4,5,6}}));
 
-    auto front = os.work().front();
+    auto front = *rez.begin();
     EXPECT_EQ(front.data.size(), 5);
     EXPECT_EQ(front.pos, 0);
     for (int i = 0; i < 5; i++) {
         EXPECT_EQ(front.data[i], i);
     }
 
-    auto back = os.work().back();
+    auto back = *std::prev(rez.end());
     EXPECT_EQ(back.data.size(), 2);
     EXPECT_EQ(back.pos, 5);
     for (int i = 0; i < 2; i++) {
         EXPECT_EQ(back.data[i], back.pos + i);
     }
-    EXPECT_EQ(os.work().size(), 2);
+    EXPECT_EQ(rez.size(), 2);
 }
 
 TEST(segments, MnsertUnmergeableSegments) 
 {
     OrderedSegmentsTest os;
+    std::set<Chunk, CompChunks> rez;
     
-    os.handleChunk({FILE_ID, 0, {0,0,0}});
-    os.handleChunk({FILE_ID, 5, {0,0}});
-    os.handleChunk({FILE_ID, 9, {0}});
+    rez.merge(os.handleChunk({FILE_ID, 0, {0,0,0}}));
+    rez.merge(os.handleChunk({FILE_ID, 5, {0,0}}));
+    rez.merge(os.handleChunk({FILE_ID, 9, {0}}));
 
     auto it = os.segs().begin();
     EXPECT_EQ(*it, Segment({0, 2}));
@@ -121,178 +123,172 @@ TEST(segments, MnsertUnmergeableSegments)
     EXPECT_EQ(*it, Segment({5, 6}));
     it++;
     EXPECT_EQ(*it, Segment({9, 9}));
-    EXPECT_EQ(os.work().size(), 3);
+    EXPECT_EQ(rez.size(), 3);
 }
 
 TEST(segments, ChunkForDoneFile) 
 {
     OrderedSegmentsTest os;
+    std::set<Chunk, CompChunks> rez;
+    rez.merge(os.handleChunk({FILE_ID, 3, {4, 5, 6}}));
+    rez.merge(os.handleChunk({FILE_ID, 0, {1, 2, 3}}));
     
-    os.handleChunk({FILE_ID, 3, {4, 5, 6}});
-    os.handleChunk({FILE_ID, 0, {1, 2, 3}});
-    os.handleChunk({FILE_ID, 2, {3, 4}});
+    rez.merge(os.handleChunk({FILE_ID, 2, {3, 4}}));
 
     auto it = os.segs().begin();
     EXPECT_EQ(*it, Segment({0, 5}));
-    EXPECT_EQ(os.work().size(), 2);
-    EXPECT_EQ(os.work().front().data, std::vector<uint8_t>({4, 5, 6}));
-    EXPECT_EQ(os.work().back().data, std::vector<uint8_t>({1, 2, 3}));
+    EXPECT_EQ(rez.size(), 2);
+    EXPECT_EQ(rez.begin()->data, std::vector<uint8_t>({1, 2, 3}));
+    EXPECT_EQ(std::prev(rez.end())->data, std::vector<uint8_t>({4, 5, 6}));
 }
 
 TEST(segments, splitBackwards) 
 {
     OrderedSegmentsTest os;
+    std::set<Chunk, CompChunks> rez;
     
-    os.handleChunk({FILE_ID, 0, {0,0,0,0,0}});
-    os.handleChunk({FILE_ID, 3, {0,0,0}});
-    os.handleChunk({FILE_ID, 9, {0}});
+    rez.merge(os.handleChunk({FILE_ID, 0, {0,0,0,0,0}}));
+    rez.merge(os.handleChunk({FILE_ID, 3, {0,0,0}}));
+    rez.merge(os.handleChunk({FILE_ID, 9, {0}}));
 
     auto it = os.segs().begin();
     
     EXPECT_EQ(*it, Segment({0, 5}));
     it++;
     EXPECT_EQ(*it, Segment({9, 9}));
-    EXPECT_EQ(os.work().size(), 3);
+    EXPECT_EQ(rez.size(), 3);
 }
 
 TEST(segments, splitForward) 
 {
     OrderedSegmentsTest os;
+    std::set<Chunk, CompChunks> rez;
     
-    os.handleChunk({FILE_ID, 0, {0,0,0}});
-    os.handleChunk({FILE_ID, 4, {0,0,0,0,0}});
-    os.handleChunk({FILE_ID, 6, {0,0,0,0}});
+    rez.merge(os.handleChunk({FILE_ID, 0, {0,0,0}}));
+    rez.merge(os.handleChunk({FILE_ID, 4, {0,0,0,0,0}}));
+    rez.merge(os.handleChunk({FILE_ID, 6, {0,0,0,0}}));
 
     auto it = os.segs().begin();
     EXPECT_EQ(*it, Segment({0, 2}));
     it++;
     EXPECT_EQ(*it, Segment({4, 9}));
-    EXPECT_EQ(os.work().size(), 3);
+    EXPECT_EQ(rez.size(), 3);
 }
 
 TEST(segments, splitForwardsAndBackwards) 
 {
     OrderedSegmentsTest os;
+    std::set<Chunk, CompChunks> rez;
     
-    os.handleChunk({FILE_ID, 0, {0,0,0}});
-    os.handleChunk({FILE_ID, 6, {0,0,0,0}});
-    os.handleChunk({FILE_ID, 3, {0,1,2,0,0}});
+    rez.merge(os.handleChunk({FILE_ID, 0, {0,0,0}}));
+    rez.merge(os.handleChunk({FILE_ID, 6, {0,0,0,0}}));
+    rez.merge(os.handleChunk({FILE_ID, 3, {0,1,2,0,0}}));
 
     auto it = os.segs().begin();
     EXPECT_EQ(*it, Segment({0, 9}));
 
-    auto fr = os.work().front();
+    auto fr = *rez.begin();
     EXPECT_EQ(fr.pos, 0);
 
-    auto bc = os.work().back();
-    EXPECT_EQ(bc.pos, 3);
-    EXPECT_EQ(bc.data.size(), 3);
-    for (int i = 0; i < 3; i++) {
-        EXPECT_EQ(bc.data[i], i);
-    }
-    EXPECT_EQ(os.work().size(), 3);
+    auto bc = *std::prev(rez.end());
+    EXPECT_EQ(bc.pos, 6);
+    EXPECT_EQ(bc.data.size(), 4);
 }
 
 TEST(segments, OneByOne) 
 {
     OrderedSegmentsTest os;
+    std::set<Chunk, CompChunks> rez;
     
-    os.handleChunk({FILE_ID, 0, {0}});
-    os.handleChunk({FILE_ID, 1, {1}});
-    os.handleChunk({FILE_ID, 2, {2}});
-    os.handleChunk({FILE_ID, 3, {3}});
-    os.handleChunk({FILE_ID, 4, {4}});
-    os.handleChunk({FILE_ID, 5, {5}});
+    rez.merge(os.handleChunk({FILE_ID, 0, {0}}));
+    rez.merge(os.handleChunk({FILE_ID, 1, {1}}));
+    rez.merge(os.handleChunk({FILE_ID, 2, {2}}));
+    rez.merge(os.handleChunk({FILE_ID, 3, {3}}));
+    rez.merge(os.handleChunk({FILE_ID, 4, {4}}));
+    rez.merge(os.handleChunk({FILE_ID, 5, {5}}));
 
     auto it = os.segs().begin();
     EXPECT_EQ(*it, Segment({0, 5}));
 
-    auto fr = os.work().front();
+    auto fr = *rez.begin();
     EXPECT_EQ(fr.pos, 0);
     EXPECT_EQ(fr.data.size(), 1);
     EXPECT_EQ(fr.data[0], 0);
 
-    auto bc = os.work().back();
+    auto bc = *std::prev(rez.end());
     EXPECT_EQ(bc.pos, 5);
     EXPECT_EQ(bc.data.size(), 1);
     EXPECT_EQ(bc.data[0], 5);
-    EXPECT_EQ(os.work().size(), 6);
+    EXPECT_EQ(rez.size(), 6);
 }
 
 TEST(segments, duplicatesAddNoWorkAndSegment) 
 {
     OrderedSegmentsTest os;
+    std::set<Chunk, CompChunks> rez;
     
-    os.handleChunk({FILE_ID, 0, {0,1,2}});
-    os.handleChunk({FILE_ID, 0, {0,1,2}});
+    rez.merge(os.handleChunk({FILE_ID, 0, {0,1,2}}));
+    rez.merge(os.handleChunk({FILE_ID, 0, {0,1,2}}));
 
     auto it = os.segs().begin();
     EXPECT_EQ(*it, Segment({0, 2}));
 
-    auto bc = os.work().back();
+    auto bc = *std::prev(rez.end());
     EXPECT_EQ(bc.pos, 0);
-    os.work().pop();
-    EXPECT_EQ(os.work().empty(), true);
-    EXPECT_EQ(os.work().size(), 0);
+    EXPECT_EQ(rez.size(), 1);
 }
 
 TEST(segments, emptyChunk) 
 {
     OrderedSegmentsTest os;
+    std::set<Chunk, CompChunks> rez;
     
-    os.handleChunk({FILE_ID, 4, {}});
+    rez.merge(os.handleChunk({FILE_ID, 4, {}}));
 
     EXPECT_EQ(os.segs().size(), 0);
-    EXPECT_EQ(os.work().empty(), true);
-    EXPECT_EQ(os.work().size(), 0);
+    EXPECT_EQ(rez.empty(), true);
 }
 
 TEST(segments, splitPoints) 
 {
     OrderedSegmentsTest os;
+    std::set<Chunk, CompChunks> rez;
     
-    os.handleChunk({FILE_ID, 0, {0}});
-    os.handleChunk({FILE_ID, 2, {1}});
-    os.handleChunk({FILE_ID, 4, {2}});
-    os.handleChunk({FILE_ID, 0, {0,0,1,1,2}});
+    rez.merge(os.handleChunk({FILE_ID, 0, {0}}));
+    rez.merge(os.handleChunk({FILE_ID, 2, {2}}));
+    rez.merge(os.handleChunk({FILE_ID, 4, {4}}));
+    rez.merge(os.handleChunk({FILE_ID, 0, {0,1,2,3,4}}));
     
     auto it = os.segs().begin();
     EXPECT_EQ(*it, Segment({0, 4}));
-    EXPECT_EQ(os.work().size(), 5);
-    for (int i = 0; i < 3; i++) {
-        EXPECT_EQ(os.work().front().data[0], i); 
-        os.work().pop();
-    }
-    for (int i = 0; i < 2; i++) {
-        EXPECT_EQ(os.work().front().data[0], i);
-        os.work().pop();
+    EXPECT_EQ(rez.size(), 5);
+    for (int i = 0; i < 5; i++) {
+        EXPECT_EQ(rez.begin()->data[0], i); 
+        EXPECT_EQ(rez.begin()->pos, i); 
+        rez.erase(rez.begin());
     }
 }
 
 TEST(segments, splitIntervals) 
 {
     OrderedSegmentsTest os;
+    std::set<Chunk, CompChunks> rez;
     
-    os.handleChunk({FILE_ID, 0, {0, 1}});
-    os.handleChunk({FILE_ID, 3, {3, 4}});
-    os.handleChunk({FILE_ID, 6, {6, 7}});
-    os.handleChunk({FILE_ID, 0, {0,1,2,3,4,5,6,7,8,9}});
+    rez.merge(os.handleChunk({FILE_ID, 0, {0, 1}}));
+    rez.merge(os.handleChunk({FILE_ID, 3, {3, 4}}));
+    rez.merge(os.handleChunk({FILE_ID, 6, {6, 7}}));
+    rez.merge(os.handleChunk({FILE_ID, 0, {0,1,2,3,4,5,6,7,8}}));
     
     auto it = os.segs().begin();
     EXPECT_EQ(it->l, 0);
-    EXPECT_EQ(it->r, 9);
-    for (int i = 0; i < 3; i++) {
-        EXPECT_EQ(os.work().front().data[0], i*3);
-        EXPECT_EQ(os.work().front().data[1], i*3+1);
-        os.work().pop();
-    }
+    EXPECT_EQ(it->r, 8);
 
-    EXPECT_EQ(os.work().front().data[0], 2);
-    os.work().pop();
-    EXPECT_EQ(os.work().front().data[0], 5);
-    os.work().pop();
-    EXPECT_EQ(os.work().front().data[0], 8);
-    EXPECT_EQ(os.work().front().data[1], 9);
-    os.work().pop();
-    EXPECT_EQ(os.work().empty(), true);
+    EXPECT_EQ(rez.size(), 6);
+    int idx = 0;
+    for (int i = 0; i < 6; i++) {
+        EXPECT_EQ(rez.begin()->pos, idx);
+        for (int j = 0; j < rez.begin()->data.size(); j++)
+            EXPECT_EQ(rez.begin()->data[j], idx++);
+        rez.erase(rez.begin());
+    }
 }

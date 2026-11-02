@@ -10,13 +10,15 @@ void OrderedSegments::makeAsync(std::mutex* workMutex, std::condition_variable* 
     isAsync_ = true;
 }
 
-void OrderedSegments::handleChunk(Chunk chunk) {
-    if (chunk.data.empty()) return;
+std::set<Chunk, CompChunks> OrderedSegments::handleChunk(Chunk chunk) {
+    if (chunk.data.empty()) return {};
     if (chunk.data.size() > SIZE_MAX - chunk.pos) 
         throw std::out_of_range("Chunk position overflow");
+
     std::unique_lock<std::mutex> segLock;
     if (isAsync_) segLock = std::unique_lock<std::mutex>(segmentsMutex);
 
+    std::set<Chunk, CompChunks> uniqueChunks;
     const size_t begin = chunk.pos;
     const size_t end = begin + chunk.data.size();
     Segment seg{begin, end - 1};
@@ -39,7 +41,7 @@ void OrderedSegments::handleChunk(Chunk chunk) {
         if (isAsync_) {
             workLock = std::unique_lock<std::mutex>(*workMutex_);
         }
-        work->push({
+        uniqueChunks.insert({
             chunk.fileId,
             l,
             std::vector<std::uint8_t>(
@@ -47,10 +49,11 @@ void OrderedSegments::handleChunk(Chunk chunk) {
                 chunk.data.begin() + (r - begin)
             )
         });
-        if (isAsync_) {
-            workLock.unlock();
-            alarm_->notify_one();
-        }
+        lastRestore_ = r - l;
+        // if (isAsync_) {
+        //     workLock.unlock();
+        //     alarm_->notify_one();
+        // }
     };
 
     while (it != segments.end()) {
@@ -80,4 +83,6 @@ void OrderedSegments::handleChunk(Chunk chunk) {
     // Remaining uncovered bytes
     addWork(cursor, end);
     segments.insert(seg);
+
+    return uniqueChunks;
 }

@@ -10,7 +10,7 @@
 #include <mutex>
 #include <vector>
 #include <condition_variable>
-#include <optional>
+#include <queue>
 #include <atomic>
 #include <set>
 
@@ -45,7 +45,7 @@ private:
     void work();
     struct File {
         std::set<Chunk, CompChunks> chunks;  
-        std::optional<OrderedSegments> ordseg;
+        OrderedSegments ordseg;
         std::atomic<std::int64_t> dataRestored;
         size_t fileSize;
     };

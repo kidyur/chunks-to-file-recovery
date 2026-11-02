@@ -48,8 +48,7 @@ void FileCollector::CollectFile(
 
     files_[fileId].fileSize = fileSize;
     files_[fileId].dataRestored = 0;
-    files_[fileId].ordseg.emplace(&chunksQuery);
-    files_[fileId].ordseg->makeAsync(&chunksQueryMutex, &chunksQueryCv);
+    files_[fileId].ordseg.makeAsync(&chunksQueryMutex, &chunksQueryCv);
 }
 
 
@@ -70,7 +69,7 @@ void FileCollector::OnNewChunk(
             size_t l = i;
             size_t r = l + std::min(FileCollector::kMaxChunkSize, chunk.size() - l);
 
-            files_[fileId].ordseg->handleChunk({
+            auto tmp = files_[fileId].ordseg.handleChunk({
                 fileId,
                 pos + l,
                 std::vector<std::uint8_t>(
@@ -78,30 +77,33 @@ void FileCollector::OnNewChunk(
                     chunk.begin() + r
                 )
             });
+            files_[fileId].dataRestored += files_[fileId].ordseg.lastRestore(); // TODO: the data size, not the set
+            files_[fileId].chunks.merge(tmp);
         }
     } else {
-        files_[fileId].ordseg->handleChunk({fileId, pos, chunk});
+        auto tmp = files_[fileId].ordseg.handleChunk({fileId, pos, std::move(chunk)});
+
+        files_[fileId].dataRestored += files_[fileId].ordseg.lastRestore(); // TODO: the data size, not the set
+        files_[fileId].chunks.merge(tmp);
     }
 }
 
 
 void FileCollector::work() {
-    while (stopping_ == false) {
+    while (0 /*stopping_ == false*/ ) {
         std::unique_lock queryLock(chunksQueryMutex);
         chunksQueryCv.wait(queryLock, [this](){
-            return stopping_ || !chunksQuery.empty();
+            return stopping_;
         });
 
-        if (stopping_ && chunksQuery.empty()) {
+        if (stopping_) {
             return;
         }
 
-        std::uint64_t id = chunksQuery.front().fileId;
-        std::uint64_t size = chunksQuery.front().data.size();
-        files_[id].chunks.insert(std::move(chunksQuery.front()));
-        chunksQuery.pop();
-
-        files_[id].dataRestored += size;
+        // std::uint64_t id = chunksQuery.front().fileId;
+        // std::uint64_t size = chunksQuery.front().data.size();
+        // files_[id].chunks.insert(std::move(chunksQuery.front()));
+        // chunksQuery.pop();
     }
 }
 
