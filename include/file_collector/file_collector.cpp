@@ -119,9 +119,7 @@ std::vector<std::uint8_t> FileCollector::GetFile(const std::uint32_t fileId)
     while (pos != files_.at(fileId).fileSize) {
         for (size_t i = 0; i < it->data.size(); i++)  {
             file[pos + i] = it->data[i];
-            std::cout << it->data[i];
         }
-        std::cout << '\n';
         pos += it->data.size();
         it++;
     }
