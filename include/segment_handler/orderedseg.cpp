@@ -2,13 +2,6 @@
 #include <stdexcept>
 #include <iostream>
 
-void OrderedSegments::makeAsync(std::mutex* workMutex, std::condition_variable* alarm) {
-    if (workMutex == nullptr || alarm == nullptr)
-        throw std::invalid_argument("invalid arguments for async mode");
-    workMutex_ = workMutex;
-    alarm_ = alarm;
-    isAsync_ = true;
-}
 
 std::set<Chunk, CompChunks> OrderedSegments::handleChunk(Chunk chunk) {
     if (chunk.data.empty()) return {};
@@ -16,7 +9,6 @@ std::set<Chunk, CompChunks> OrderedSegments::handleChunk(Chunk chunk) {
         throw std::out_of_range("Chunk position overflow");
 
     std::unique_lock<std::mutex> segLock;
-    if (isAsync_) segLock = std::unique_lock<std::mutex>(segmentsMutex);
 
     std::set<Chunk, CompChunks> uniqueChunks;
     const size_t begin = chunk.pos;
@@ -37,10 +29,6 @@ std::set<Chunk, CompChunks> OrderedSegments::handleChunk(Chunk chunk) {
     // Add only uncovered bytes to the queue
     auto addWork = [&](size_t l, size_t r) {
         if (l >= r) return;
-        std::unique_lock<std::mutex> workLock;
-        if (isAsync_) {
-            workLock = std::unique_lock<std::mutex>(*workMutex_);
-        }
         uniqueChunks.insert({
             chunk.fileId,
             l,

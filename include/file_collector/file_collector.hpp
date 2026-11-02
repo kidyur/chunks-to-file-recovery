@@ -40,6 +40,9 @@ private:
     static constexpr size_t kDefThreadsNumber = 4;
     std::uint32_t threadsAvailable = 0;
 
+    std::condition_variable cv;
+    std::mutex mutex;
+    
     bool stopping_ = false;
 
     void work();
@@ -50,10 +53,6 @@ private:
         size_t fileSize;
     };
     std::vector<std::thread> threads_;
-
-    std::condition_variable chunksQueryCv;
-    std::mutex chunksQueryMutex;
-    std::queue<Chunk> chunksQuery;
 
     std::unordered_map<std::uint32_t, File> files_;
 };

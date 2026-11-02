@@ -24,12 +24,9 @@ FileCollector::FileCollector()
 }
 
 FileCollector::~FileCollector() {
-    {
-        std::lock_guard lock(chunksQueryMutex);
-        stopping_ = true;
-    }
+    stopping_ = true;
 
-    chunksQueryCv.notify_all();
+    cv.notify_all();
 
     for (auto& thread : threads_) {
         if (thread.joinable()) {
@@ -48,7 +45,6 @@ void FileCollector::CollectFile(
 
     files_[fileId].fileSize = fileSize;
     files_[fileId].dataRestored = 0;
-    files_[fileId].ordseg.makeAsync(&chunksQueryMutex, &chunksQueryCv);
 }
 
 
@@ -91,8 +87,8 @@ void FileCollector::OnNewChunk(
 
 void FileCollector::work() {
     while (0 /*stopping_ == false*/ ) {
-        std::unique_lock queryLock(chunksQueryMutex);
-        chunksQueryCv.wait(queryLock, [this](){
+        std::unique_lock lock(mutex);
+        cv.wait(lock, [this](){
             return stopping_;
         });
 
